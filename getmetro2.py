@@ -1,15 +1,11 @@
 #This program calls WMATA's API, gets trains and times for Silver Spring
-#and prints the results to <STDIN>
+#and sends them to the led sign via a perl program.
 #Perl code now called from via subprocess in Python
 #Called every 30 seconds via a crontab and shellscript
 #Originally written for Python2
-#4-11-15 Started using actual revision control
-#3-22-15 Fixed IOError exception handling
-#3-1-15 Added handling exceptions to deal with internet outages
 #November 2014 Created
 #Author: Brian Thomson
-import urllib #PYTHON2
-#import urllib.request #PYTHON3
+import urllib.request #PYTHON3
 import json
 import subprocess
 #public API key, please get your own for continuously repeated calls
@@ -18,12 +14,8 @@ proc=subprocess.Popen(['perl','signmaster.pl'],stdin=subprocess.PIPE) #Uncomment
 s=""
 y=0
 try:
-        #Python2 next 2 lines
-        response=urllib.urlopen(url)
-        data=json.loads(response.read())['Trains']
-        #Python3 next 2 lines - note that data request is now a bytestream
-        #response=urllib.request.urlopen(url)
-        #data=json.loads(response.read().decode('utf-8'))['Trains']
+        response=urllib.request.urlopen(url)
+        data=json.loads(response.read().decode('utf-8'))['Trains']
         for x in data:
                 y+=1
                 try:
