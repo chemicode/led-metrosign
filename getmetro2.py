@@ -10,7 +10,7 @@ import json
 import subprocess
 #public API key, please get your own for continuously repeated calls
 url="http://api.wmata.com/StationPrediction.svc/json/GetPrediction/B08?api_key=kfgpmgvfgacx98de9q3xazww"
-proc=subprocess.Popen(['perl','signmaster.pl'],stdin=subprocess.PIPE) #Uncomment before delpoying on PI
+proc=subprocess.Popen(['perl','signmaster.pl'],stdin=subprocess.PIPE,universal_newlines=True) #Uncomment before delpoying on PI
 s=""
 y=0
 try:
