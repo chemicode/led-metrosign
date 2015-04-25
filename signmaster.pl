@@ -5,7 +5,7 @@
 #Data is taken from STDIN...this is my first perl program...
 #The trick is this requires both the Device::MiniLED 
 #and Device::SerialPort Libraries. And must point to the correct dir's
-#Created Decmeber 2014
+#Created December 2014
 #Author Brian Thomson
 
 use strict;
