@@ -23,18 +23,23 @@ def setupconfig():
         station=input("Enter your station code: ")
         walktime=input("How long (minutes) to walk to the metro? ")
         newapi=""
-        newapi=input("Change API Code (y/n)? ")
-        while newapi!="y" | newapi!="Y" | newapi!="n" | newapi!="N":
-                if newapi=="y" | newapi=="Y": #terrible code and must be fixed once I have time with regex!
+        simulate=""
+        while newapi!="y" or newapi!="Y" or newapi!="n" or newapi!="N":
+                newapi=input("Change API Code (y/n)? ")
+                if newapi=="y" or newapi=="Y": #terrible code and must be fixed once I have time with regex!
                         apikey=input("Enter new API Key: ")
-                elif newapi=="n" | newapi=="N":
+                        break
+                elif newapi=="n" or newapi=="N":
                         apikey=defaultconfig['apikey']
-        simulate=input("Simulated mode on (turn off when using on Raspberry PI)?\n Enter "'y'" for on and "'n'" for off: ")
-        while simulate!="y" | simulate!="Y" | simulate!="n" | simulate!="N":
-                if simulate=="n" | simulate=="N": #ditto above!
+                        break
+        while simulate!="y" or simulate!="Y" or simulate!="n" or simulate!="N":
+                simulate=input("Simulated mode on (turn off when using on Raspberry PI)?\n Enter "'y'" for on and "'n'" for off: ")
+                if simulate=="n" or simulate=="N": #ditto above!
                         simulate=False
-                elif simulate=="y" | simulate=="Y":
+                        break
+                elif simulate=="y" or simulate=="Y":
                         simlulate=True
+                        break
         config={'station':station,'apikey':apikey,'walktime':str(walktime),'loop':'False','simulate':simulate}
         json.dump(config,open('config.json','w'),sort_keys=True,indent=4)
 
