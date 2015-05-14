@@ -1,16 +1,12 @@
 #This program calls WMATA's API, gets trains and times for Silver Spring
 #and pipes them to the led sign via a perl program.
 #Called every 30 seconds via a crontab and shellscript
-#Hardware dependent, only works with RPI and LEDSign
+#Hardware dependent, only works with RPI and LEDSign but can simulate and print
 #November 2014 Created
 #Author: Brian Thomson
 from time import strftime
-import urllib.request #PYTHON3
-import json
-import subprocess
-import argparse
-
-defaultconfig={'station':'B08','apikey':'kfgpmgvfgacx98de9q3xazww','walktime':'6','loop':'False','simulate':'True'}
+import urllib.request, json, subprocess, argparse, re
+import mymetro, mysign
 
 def setupconfig():
         """
@@ -18,121 +14,93 @@ def setupconfig():
         Since the program may be started and stopped and restarted later
         we want to preserve the user information in a permanent place so the
         user doesn't have to setup each time.
-        Config info is stored in a JSON file since I'm using JSON anyways for the Metro API
+        Config info is stored in a JSON file since I'm using the JSON library
+        anyways for the Metro API
         """
         station=input("Enter your station code: ")
         walktime=input("How long (minutes) to walk to the metro? ")
         newapi=""
         simulate=""
-        while newapi!="y" or newapi!="Y" or newapi!="n" or newapi!="N":
+        while True:
                 newapi=input("Change API Code (y/n)? ")
-                if newapi=="y" or newapi=="Y": #terrible code and must be fixed once I have time with regex!
+                if re.match("y|yes",newapi,re.IGNORECASE):
                         apikey=input("Enter new API Key: ")
                         break
-                elif newapi=="n" or newapi=="N":
-                        apikey=defaultconfig['apikey']
+                elif re.match("n|no",newapi,re.IGNORECASE):
+                        try:
+                                apikey=json.load(open('config.json'))['apikey']
+                        except:
+                                apikey=defaultconfig['apikey']
+                                print("No config file, defaultin to public key")
                         break
-        while simulate!="y" or simulate!="Y" or simulate!="n" or simulate!="N":
+        while True:
                 simulate=input("Simulated mode on (turn off when using on Raspberry PI)?\n Enter "'y'" for on and "'n'" for off: ")
-                if simulate=="n" or simulate=="N": #ditto above!
+                if re.match("n|no",simulate,re.IGNORECASE):
                         simulate=False
                         break
-                elif simulate=="y" or simulate=="Y":
-                        simlulate=True
+                elif re.match("y|yes",simulate,re.IGNORECASE):
+                        simulate=True
                         break
         config={'station':station,'apikey':apikey,'walktime':str(walktime),'loop':'False','simulate':simulate}
         json.dump(config,open('config.json','w'),sort_keys=True,indent=4)
 
 def resetdata():
         """Factroy Defaults, if you will"""
-        json.dump(defaultconfig,open('config.json','w'),sort_keys=True,indent=4)
+        json.dump(mymetro.defaultconfig,open('config.json','w'),sort_keys=True,indent=4)
 
-parser=argparse.ArgumentParser()
-parser.add_argument("-l","--loop", nargs="?", help="program continuosly loops") #not yet implemented, use cron
-parser.add_argument("-s","--setup", nargs="?", help="enter setup mode")
-parser.add_argument("-r","--reset", nargs="?", help="reset to defaults")
-parser.add_argument("-a","--add", nargs="?", help="Add a custom message") #Add custom message need to make dealing with multiple words easier
-args=parser.parse_args()
+def main():
+        parser=argparse.ArgumentParser()
+        parser.add_argument("-s","--setup", action='store_true', help="enter setup mode")
+        parser.add_argument("-r","--reset", action='store_true', help="reset to defaults")
+        parser.add_argument("-a","--add", nargs="?", help="Add a custom message") #Add custom message need to make dealing with multiple words easier
+        args=parser.parse_args()
 
-if args.reset:
-        resetdata()
+        if args.reset:
+                resetdata()
 
-if args.setup:
-        setupconfig()
+        if args.setup:
+                setupconfig()
 
-#add a routine to check for existence, go to reset routine, providing defaults
-try:
-        metroconf=json.load(open('config.json'))
-except:
-        resetdata()
-        metroconf=json.load(open('config.json'))
+        #add a routine to check for existence of config.JSON
+        try:
+                metroconf=json.load(open('config.json'))
+        except:
+                resetdata()
+                metroconf=json.load(open('config.json'))
+                               
+        sign=mysign.mySign()
+        metrodat=mymetro.myMetro()
+        sign.simulate=bool(metroconf['simulate'])
+        
+        if args.add:
+                sign.addmessage(args.add)
 
-class myMetro:
-        def __init__(self):
+        try:
+                response=urllib.request.urlopen(metrodat.url())
+                data=json.loads(response.read().decode('utf-8'))['Trains']
+                for x in data:
+                        try:
+                                if int(x['Min'])>=metrodat.walktime:
+                                        sign.addmessage(str(x['Destination']) +" "+  str(x['Min']))   
+                        #Handle all non-int cases (ARR, BRD, ---, etc)
+                        except ValueError:
+                                pass
+                        if len(sign.message)>=sign.maxmessage-1:
+                                break
+                if sign.message==[] or sign.message==[args.add]:
+                        sign.addmessage("No Trains!")
+                sign.addmessage(strftime("%H:%M"))
+                sign.sendmessage()
+
+        except IOError:
+                sign.addmessage("IO Error!")
+                sign.addmessage("Chk Wifi")
+                sign.addmessage(strftime("%H:%M"))
+                sign.sendmessage()
                 try:
-                        metroconf=json.load(open('config.json'))
+                        subprocess.call(["ifreset.sh"]) #usually resetting WIFI solves connection problems
                 except:
-                        resetdata()
-                        metroconf=json.load(open('config.json'))                       
-                self.station=metroconf['station']
-                self.apikey=metroconf['apikey']
-                self.walktime=int(metroconf['walktime']) #how long it takes to walk to station
-        def url(self):
-                return "http://api.wmata.com/StationPrediction.svc/json/GetPrediction/"+self.station+"?api_key="+self.apikey
-
-class mySign:
-        def __init__(self): #do i need this?  
-                metroconf=json.load(open('config.json'))        
-                self.simulate=bool(metroconf['simulate']) #Simulated mode prints output, otherwise it outputs to the sign
-                #thus it should be false only if it is being deployed on the raspberry PI, with LED sign
-                self.message=[]
-                self.maxmessage=5
-                self.nummessage=0
-        def addmessage(self, message):
-                if len(self.message)<=self.maxmessage:
-                        self.message.append(message)                        
-        def messageout(self):
-                """Prepares and writes message for STDOUT or LED sign"""
-                s=""
-                for i,x in enumerate(self.message):
-                        s+=x
-                        if i <(len(self.message)-1):
-                                s+="\n"
-                return s
-                        
-sign=mySign()
-metrodat=myMetro()
-
-if sign.simulate==False:
-        proc=subprocess.Popen(['perl','signmaster.pl'],stdin=subprocess.PIPE,universal_newlines=True)
-
-if args.add:
-        sign.addmessage(args.add)
-
-try:
-        response=urllib.request.urlopen(metrodat.url())
-        data=json.loads(response.read().decode('utf-8'))['Trains']
-        for x in data:
-                try:
-                        if int(x['Min'])>=metrodat.walktime:
-                                sign.addmessage(str(x['Destination']) +" "+  str(x['Min']))   
-                #Handle all non-int cases (ARR, BRD, ---, etc)
-                except ValueError:
                         pass
-                if len(sign.message)>=sign.maxmessage-1:
-                        break
-        if sign.message==[]:
-                sign.addmessage("No Trains!")
-        sign.addmessage(strftime("%H:%M"))
-        if sign.simulate==False:
-                proc.communicate(sign.messageout())
-        else:
-                print(sign.messageout())
-except IOError:
-        sign.addmessage("IO Error!")
-        sign.addmessage("Chk Wifi")
-        if sign.simulate==False:
-                proc.communicate(sign.messageout())
-                subprocess.call(["ifreset.sh"])
-        else:
-                print(sign.messageout())
+                
+if __name__ == "__main__":
+        main()
