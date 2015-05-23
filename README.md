@@ -5,7 +5,7 @@ Grabs metro arrival times (and other data) and displays them on an LED sign
 This program uses a Raspberry PI, the WMATA Metro API and an LED sign (http://brightledsigns.com/programmable/indoor/bs-4x16-mini)
 to create a metro signboard that displays the current train times for my station.  Currently the program is called repeatedly via Cron every 30 seconds (shellscript that calls it twice with a 30 second delay).
 
-Currently, some Linux dependencies exist such as the 
+Currently, some Linux dependencies exist such as the subprocess module.
 
 #Setup
 You need to obtain a WMATA API key by registering as a developer at https://developer.wmata.com/.  Or you can use the demo API key.  After obtaining the LED sign and a Raspberry PI, the files downloaded to the PI.  The config.json contains my default settings they can be changed by running this command from the commandline:
